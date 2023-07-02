@@ -164,7 +164,8 @@ int aesd_init_module(void)
 
     aesd_device.r_pos=0;
     aesd_device.w_pos=0;
-    for(int i =0; i < 10; i++){
+    int i;
+    for(i =0; i < 10; i++){
         aesd_device.buffer[i] = kmalloc(BUFFSIZE,GFP_KERNEL);
         memset(aesd_device.buffer[i],0,BUFFSIZE);
     }
