@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ "$1" == "start" ]
+then
+    aesdchar_load
+fi
+
+if [ "$1" == "stop" ]
+then 
+    aesdchar_unload
+fi
