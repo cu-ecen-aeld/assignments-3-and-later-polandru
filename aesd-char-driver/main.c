@@ -25,6 +25,7 @@ MODULE_AUTHOR("Your Name Here"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
+int cc;
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
@@ -58,14 +59,21 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     /**
      * TODO: handle read
      */
-
-    if(mutex_lock_interruptible(&aesd_device.lock)){
+    if(*f_pos > 0){
+        aesd_device.r_pos =0;
+    }
+    if(cc>9)return 0;
+    if(!mutex_lock_interruptible(&aesd_device.lock)){
        int len = strlen(aesd_device.buffer[aesd_device.r_pos]);
-       if(len  > 0 && strlen(aesd_device.buffer[aesd_device.r_pos])>0){
+       if(len  > 0){
+        printk("LENGTH %d", len);
         retval = len;
+        
         copy_to_user(buf,aesd_device.buffer[aesd_device.r_pos],len);
-        aesd_device.r_pos = (aesd_device.r_pos+1)%10;
+ 
+        cc++;
        }
+        aesd_device.r_pos = (aesd_device.r_pos+1)%10;
     }
     mutex_unlock(&aesd_device.lock);
     return retval;
@@ -79,22 +87,34 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     /**
      * TODO: handle write
      */
-    if(mutex_lock_interruptible(&aesd_device.lock)){
+  
+    if(!mutex_lock_interruptible(&aesd_device.lock)){
         char * tmp =  kmalloc(count, GFP_KERNEL);
+        tmp[count] ='\0';
         copy_from_user(tmp,buf,count);
         if(count > 0){
+            if(aesd_device.r_pos == aesd_device.w_pos && strlen(aesd_device.buffer[aesd_device.r_pos]) > 0){
+                aesd_device.r_pos = (aesd_device.r_pos+1)%10;
+            }
+
             strcat(aesd_device.temp, tmp);
+            retval = count;
 
             if(tmp[count -1 ] == '\n'){
-                aesd_device.buffer[aesd_device.w_pos] = aesd_device.temp;
+                count +=strlen(aesd_device.temp);
+                printk("COUNT: %d  ATEMP: %s    TMP:%s", count, aesd_device.temp, tmp);
+                strncpy(aesd_device.buffer[aesd_device.w_pos], aesd_device.temp,count);
                 memset(aesd_device.temp,0,BUFFSIZE);
-
+                
+                aesd_device.w_pos = (aesd_device.w_pos+1)%10;
+                cc =0;
             }
                
             
         }
         kfree(tmp);
     }
+    mutex_unlock(&aesd_device.lock);
     
     return retval;
 }
@@ -149,7 +169,7 @@ int aesd_init_module(void)
     aesd_device.temp = kmalloc(BUFFSIZE,GFP_KERNEL);
     memset(aesd_device.temp,0,BUFFSIZE);
 
-
+    cc =0;
     result = aesd_setup_cdev(&aesd_device); 
 
     if( result ) {

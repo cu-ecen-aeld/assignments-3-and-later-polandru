@@ -42,7 +42,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
             return NULL;
     }
     *entry_offset_byte_rtn = char_offset;
-    printf("OUTBUFF: %d Count %d Char %ld\n",buffer->out_offs,count, char_offset);
+	//printf("OUTBUFF: %d Count %d Char %ld\n",buffer->out_offs,count, char_offset);
     return &buffer->entry[(buffer->out_offs + count )%AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED];
 }
 
@@ -61,7 +61,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     }
 
     buffer->entry[buffer->in_offs] = *add_entry;
-    printf("INDEX: %d ENTRY %s",buffer->in_offs,add_entry->buffptr);
+   // printf("INDEX: %d ENTRY %s",buffer->in_offs,add_entry->buffptr);
 
     buffer->in_offs = (buffer->in_offs + 1)%AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
 }

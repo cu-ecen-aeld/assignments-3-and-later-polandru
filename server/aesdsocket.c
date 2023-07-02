@@ -29,15 +29,12 @@ struct slist_data_s
 
 int sockfd;
 pthread_mutex_t write_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_t timestamp_thread;
 struct sigaction sa;
 
 void handle_signals(int sgno)
 {
 
 	close(sockfd);
-	chdir("/var/tmp");
-	remove("aesdsocketdata");
 	syslog(LOG_ALERT, "Caught signal exiting");
 	exit(0);
 }
@@ -45,11 +42,21 @@ void handle_signals(int sgno)
 int send_data(int connfd, FILE *fp)
 {
 
-	int size = ftell(fp);
-	char *data = calloc(sizeof(char), size);
-	fseek(fp, 0L, SEEK_SET);
-	fread(data, sizeof(char), size, fp);
-	write(connfd, data, size);
+	
+	char *data = calloc(sizeof(char), BUFFSIZE);
+	char *tmp = calloc(sizeof(char), BUFFSIZE);
+	for(int i =0; i< 10; i++){
+		int c = fread(tmp, sizeof(char),BUFFSIZE, fp);
+		if(c > 0){
+			strcat(data,tmp);
+			for(int t =0; t<strlen(data); t++){
+				if(data[t] == '\n')
+					i++;
+			}
+			
+		}
+	}
+	write(connfd, data, strlen(data));
 	free(data);
 	return 0;
 }
@@ -76,11 +83,9 @@ void *handle_connection(void *d)
 		tmp_buff[msg_len] = '\0';
 		strcat(buff, tmp_buff);
 
-		FILE *output_file = fopen("/var/tmp/aesdsocketdata", "at+");
-		pthread_mutex_lock(&write_mutex);
+		FILE *output_file = fopen("/dev/aesdchar", "a+");
 		fprintf(output_file, "%s", buff);
 		fflush(output_file);
-		pthread_mutex_unlock(&write_mutex);
 		send_data(connfd, output_file);
 
 		free(buff);
@@ -92,23 +97,6 @@ void *handle_connection(void *d)
 	return NULL;
 }
 
-void *write_time(void *a)
-{
-
-	while (1)
-	{
-		char time_str[50];
-		time_t raw;
-		time(&raw);
-		strftime(time_str, 50, "%D %T", localtime(&raw));
-		FILE *output_file = fopen("/var/tmp/aesdsocketdata", "at+");
-		pthread_mutex_lock(&write_mutex);
-		fprintf(output_file, "timestamp:%s\n", time_str);
-		fflush(output_file);
-		pthread_mutex_unlock(&write_mutex);
-		sleep(10);
-	}
-}
 
 int main(int c, char **argv)
 {
@@ -167,7 +155,6 @@ int main(int c, char **argv)
 		/* stderror */
 	}
 
-	pthread_create(&timestamp_thread, NULL, write_time, NULL);
 	if ((listen(sockfd, 5)) != 0)
 	{
 		perror("listen failed");
@@ -202,6 +189,5 @@ int main(int c, char **argv)
 
 		pthread_create(&data->thread, NULL, handle_connection, (void *)data);
 
-		syslog(LOG_INFO, "Closed connection from %s", ip);
 	}
 }
