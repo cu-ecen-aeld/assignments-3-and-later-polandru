@@ -14,6 +14,8 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <time.h>
+#include <sys/ioctl.h>
+#include "aesd_ioctl.h"
 #define BUFFSIZE 25000
 #define _XOPEN_SOURCE 700
 
@@ -65,6 +67,7 @@ void *handle_connection(void *d)
 	slist_data_t *data = (slist_data_t *)d;
 	int connfd = data->connfd;
 	data->running = true;
+	FILE *output_file = fopen("/dev/aesdchar", "a+");
 
 	char *buff;
 	char tmp_buff[BUFFSIZE];
@@ -79,22 +82,36 @@ void *handle_connection(void *d)
 		{
 			break;
 		}
+		
 
 		tmp_buff[msg_len] = '\0';
 		strcat(buff, tmp_buff);
+		if(strncmp(buff,"AESDCHAR_IOCSEEKTO",18) == 0){
+			int cmd = (int)buff[19] - 48; 
+			int off =(int)buff[21]-48;
+			syslog(LOG_ALERT,"CMD:  %d  OFF:%d",cmd,off);
+			struct aesd_seekto seekto;
+			seekto.write_cmd =cmd;
+			seekto.write_cmd_offset = off;
+			ioctl(fileno(output_file), AESDCHAR_IOCSEEKTO,&seekto);
+			send_data(connfd,output_file);
+			continue;
+		}
 
-		FILE *output_file = fopen("/dev/aesdchar", "a+");
+
 		fprintf(output_file, "%s", buff);
 		fflush(output_file);
 		send_data(connfd, output_file);
 
 		free(buff);
-		fclose(output_file);
+
 	}
 
 	close(connfd);
 	free(buff);
+	fclose(output_file);
 	return NULL;
+	
 }
 
 
